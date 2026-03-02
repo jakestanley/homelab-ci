@@ -1,11 +1,11 @@
 services:
   woodpecker-server:
-    image: woodpeckerci/woodpecker-server:latest
+    image: woodpeckerci/woodpecker-server:v3.12.0
     restart: always
     ports:
       - "20034:8000"
     environment:
-      WOODPECKER_OPEN: false
+      WOODPECKER_OPEN: ${WOODPECKER_OPEN:-false}
       WOODPECKER_ADMIN: ${WOODPECKER_ADMIN}
       WOODPECKER_HOST: ${WOODPECKER_HOST}
       WOODPECKER_GITHUB: true
@@ -17,17 +17,18 @@ services:
       - woodpecker-server-data:/var/lib/woodpecker/
 
   woodpecker-agent:
-    image: woodpeckerci/woodpecker-agent:latest
+    image: woodpeckerci/woodpecker-agent:v3.12.0
     restart: always
     depends_on:
       - woodpecker-server
     environment:
       WOODPECKER_SERVER: woodpecker-server:9000
       WOODPECKER_AGENT_SECRET: ${AGENT_SECRET}
-      WOODPECKER_BACKEND: local
+      WOODPECKER_BACKEND: docker
     volumes:
+      - woodpecker-agent-config:/etc/woodpecker
       - /var/run/docker.sock:/var/run/docker.sock
-      - /nix:/nix
 
 volumes:
   woodpecker-server-data:
+  woodpecker-agent-config:

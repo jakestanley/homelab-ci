@@ -21,6 +21,7 @@ Assumptions:
 Create `.env` from `.env.example` and set:
 - `WOODPECKER_ADMIN`: GitHub username to grant admin access.
 - `WOODPECKER_HOST`: External URL used by Woodpecker. Default is `https://ci.stanley.arpa`.
+- `WOODPECKER_OPEN`: Leave this `false` normally. Temporarily set it to `true` only for first-login/bootstrap if closed registration blocks your admin login, then set it back to `false` and recreate `woodpecker-server`.
 - `WOODPECKER_TOKEN`: Woodpecker personal access token for local helper scripts such as `scripts/add-repo.sh`.
 - `GITHUB_CLIENT_ID`: GitHub OAuth client id.
 - `GITHUB_CLIENT_SECRET`: GitHub OAuth client secret.
@@ -47,5 +48,5 @@ You'll probably want the following repos as a minimum:
 
 ## Notes
 
-- The agent uses the local backend and mounts `/var/run/docker.sock` and `/nix` from the host.
-- `network_mode: host` is intentionally not enabled for the agent so it can still reach `woodpecker-server:9000` over the Compose network.
+- The agent uses the Docker backend and mounts the host Docker socket.
+- The agent stores its config in the named volume `woodpecker-agent-config`.

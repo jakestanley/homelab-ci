@@ -49,4 +49,6 @@ You'll probably want the following repos as a minimum:
 ## Notes
 
 - The agent uses the Docker backend and mounts the host Docker socket.
+- Every pipeline step receives the host CA certificate from `/etc/homelab/certs/ca/ca.crt` at `/etc/ssl/certs/homelab-ca.crt`.
+- Pipelines that `curl` homelab services using that CA should use `curl --cacert /etc/ssl/certs/homelab-ca.crt https://...` or set `CURL_CA_BUNDLE=/etc/ssl/certs/homelab-ca.crt`.
 - The agent stores its config in the named volume `woodpecker-agent-config`.

@@ -4,7 +4,7 @@ Woodpecker CI runs here as a long-running Docker Compose service.
 
 Assumptions:
 - Service identity is `ci`, matching `services.ci` in the sibling registry.
-- The external service URL is `http://ci.stanley.arpa`.
+- The external service URL is `https://ci.stanley.arpa`.
 - The upstream port is fixed from the registry entry and mapped as `20034:8000`.
 - Reverse proxy, DNS, and any external infrastructure wiring remain owned by `homelab-infra`.
 

@@ -22,6 +22,7 @@ Create `.env` from `.env.example` and set:
 - `WOODPECKER_ADMIN`: GitHub username to grant admin access.
 - `WOODPECKER_HOST`: External URL used by Woodpecker. Default is `https://ci.stanley.arpa`.
 - `WOODPECKER_OPEN`: Leave this `false` normally. Temporarily set it to `true` only for first-login/bootstrap if closed registration blocks your admin login, then set it back to `false` and recreate `woodpecker-server`.
+- `WOODPECKER_POLL_INTERVAL`: How often Woodpecker polls GitHub for changes when webhooks cannot reach this instance. `5m` is the default in this repo.
 - `WOODPECKER_TOKEN`: Woodpecker personal access token for local helper scripts such as `scripts/add-repo.sh`.
 - `GITHUB_CLIENT_ID`: GitHub OAuth client id.
 - `GITHUB_CLIENT_SECRET`: GitHub OAuth client secret.
@@ -41,6 +42,12 @@ Create a Woodpecker personal access token in your Woodpecker profile, add it to 
 ```bash
 ./scripts/add-repo.sh owner/repo
 ```
+
+The helper also enables trusted volume access for the repository so pipeline mounts work.
+That trust change requires a Woodpecker server admin token; if the token can activate repos
+but cannot update trust, the script exits with an error after activation.
+It also ensures five cron jobs exist on the default branch: every 15 minutes, every 30
+minutes, every hour, every 6 hours, and every 24 hours.
 
 You'll probably want the following repos as a minimum:
 - homelab-infra

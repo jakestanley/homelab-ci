@@ -12,7 +12,7 @@ services:
       WOODPECKER_GITHUB_CLIENT: ${GITHUB_CLIENT_ID}
       WOODPECKER_GITHUB_SECRET: ${GITHUB_CLIENT_SECRET}
       WOODPECKER_AGENT_SECRET: ${AGENT_SECRET}
-      WOODPECKER_POLL_INTERVAL: 30m
+      WOODPECKER_POLL_INTERVAL: ${WOODPECKER_POLL_INTERVAL:-5m}
     volumes:
       - woodpecker-server-data:/var/lib/woodpecker/
 
@@ -29,7 +29,9 @@ services:
     volumes:
       - woodpecker-agent-config:/etc/woodpecker
       - /var/run/docker.sock:/var/run/docker.sock
+      - nix-cache:/nix
 
 volumes:
   woodpecker-server-data:
   woodpecker-agent-config:
+  nix-cache:

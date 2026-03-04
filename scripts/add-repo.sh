@@ -158,6 +158,16 @@ if [ -z "$default_branch" ]; then
   exit 1
 fi
 
+if ! curl -fsS \
+  -X POST \
+  -H "Authorization: Bearer $WOODPECKER_TOKEN" \
+  "$API_BASE/repos/$repo_id/repair" >/dev/null; then
+  echo "Failed to repair repository webhook configuration for $REPO_FULL_NAME." >&2
+  exit 1
+fi
+
+echo "Repaired repository webhook configuration for $REPO_FULL_NAME."
+
 repo_details_json="$(
   curl -fsS \
     -H "Authorization: Bearer $WOODPECKER_TOKEN" \

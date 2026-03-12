@@ -27,8 +27,10 @@ services:
       WOODPECKER_AGENT_SECRET: ${AGENT_SECRET}
       WOODPECKER_BACKEND: docker
       WOODPECKER_BACKEND_DOCKER_VOLUMES: /etc/homelab/certs/ca/ca.crt:/etc/ssl/certs/homelab-ca.crt:ro
+      WOODPECKER_VOLUMES: /home/jake/.ssh:/home/jake/.ssh:ro,/nix:/nix
     volumes:
       - woodpecker-agent-config:/etc/woodpecker
+      - /home/jake/.ssh:/home/jake/.ssh:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - nix-cache:/nix
 

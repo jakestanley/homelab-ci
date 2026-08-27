@@ -4,6 +4,13 @@ services:
     restart: always
     ports:
       - "${WOODPECKER_PORT:-20034}:8000"
+      # gRPC agent port, localhost-only: lets a native (non-Docker) agent
+      # running on this same host reach the server. Not registered in
+      # registry.yaml -- not reverse-proxied, not LAN-reachable, just a
+      # same-host agent<->server link. Next free port in the existing
+      # 200xx allocation sequence at the time this was added (20035 was
+      # the prior high-water mark).
+      - "127.0.0.1:${WOODPECKER_GRPC_PORT:-20036}:9000"
     environment:
       WOODPECKER_OPEN: ${WOODPECKER_OPEN:-false}
       WOODPECKER_ADMIN: ${WOODPECKER_ADMIN}

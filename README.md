@@ -10,10 +10,12 @@ Assumptions:
 
 ## Files
 
-- `docker-compose.yml`: Woodpecker server and agent.
+- `docker-compose.yml`: Woodpecker server and the default Docker-backed agent.
 - `.env.example`: Required runtime configuration placeholders.
 - `scripts/add-repo.sh`: Activates a repository through the Woodpecker API.
 - `scripts/up.sh`: Idempotent entrypoint for `docker compose up -d`.
+- `scripts/install-native-apply-agent.sh`: Installs the second, native
+  agent described in "Native apply agent" below.
 - `RECOVERY.md`: Basic recovery operations.
 
 ## Required configuration
@@ -28,7 +30,16 @@ Create `.env` from `.env.example` and set:
 - `WOODPECKER_TOKEN`: Woodpecker personal access token for local helper scripts such as `scripts/add-repo.sh`.
 - `GITHUB_CLIENT_ID`: GitHub OAuth client id.
 - `GITHUB_CLIENT_SECRET`: GitHub OAuth client secret.
-- `AGENT_SECRET`: Shared secret used by the Woodpecker server and agent.
+- `AGENT_SECRET`: Shared system token used by the Woodpecker server and
+  every agent that connects to it (both the Docker-backed agent and the
+  native apply agent below use this same value — Woodpecker doesn't
+  support inventing a distinct secret for a new agent outside its
+  per-agent-token UI flow, so the system token is what both use).
+- `WOODPECKER_GRPC_PORT`: Host port (localhost-only) the gRPC agent
+  protocol is published on, so a native (non-Docker) agent running on
+  this same host can reach the server. Default is `20036`. Not needed
+  by the Docker-backed agent, which reaches the server over the
+  internal Compose network instead.
 
 ## Start
 
@@ -124,9 +135,63 @@ You'll probably want the following repos as a minimum:
 - homelab-infra
 - nix
 
+## Native apply agent
+
+Some pipeline steps need real host privilege (writing `/etc/dnsmasq.d`,
+`/etc/nginx`, running `systemctl`) that the sandboxed Docker-backed agent
+deliberately doesn't have. Rather than bridge that gap with an SSH key
+and a `sudo`-over-SSH script (the old `ci-apply.sh` mechanism this
+replaced), those steps run on a **second, native agent** using
+Woodpecker's own `local` backend — an officially supported, unsandboxed
+agent mode intended for exactly this kind of trusted, single-operator
+setup. Woodpecker routes a whole workflow file (not individual steps) to
+a specific agent via label matching, so the workflow needing host access
+lives in its own file (`homelab-infra/.woodpecker/apply.yaml`, labeled
+`type: host-apply`) separate from the sandboxed `validate.yaml`.
+
+Setup (one-time, idempotent):
+
+```bash
+sudo bash scripts/install-native-apply-agent.sh /path/to/woodpecker-agent.deb
+```
+
+Download the matching agent `.deb` for the currently-running server
+version from `https://github.com/woodpecker-ci/woodpecker/releases` (asset
+named `woodpecker-agent_<version>_amd64.deb`) before running this.
+
+The script:
+- installs the package (it ships only a binary + systemd unit + example
+  env file — no post-install automation, so everything below is done by
+  this script instead)
+- creates a dedicated, unprivileged `woodpecker` system user (the
+  package's own systemd unit runs as this user, not the operator's
+  account)
+- creates `/var/lib/woodpecker-apply`, the fixed *prefix* directory the
+  `local` backend clones each workflow run into (a random subfolder per
+  run — the backend has no option for a fully fixed per-run path)
+- writes `/etc/woodpecker/woodpecker-agent.env` (root-only, `600`) using
+  the same `AGENT_SECRET` system token this repo's `.env` already has,
+  and points `WOODPECKER_AGENT_CONFIG_FILE` at
+  `/var/lib/woodpecker/agent.conf` — the state directory the systemd
+  unit already owns for the `woodpecker` user — so the agent keeps its
+  server-assigned identity across restarts instead of re-registering as
+  a new agent every time
+- installs a narrowly-scoped `sudoers` rule:
+  `woodpecker ALL=(root) NOPASSWD: /var/lib/woodpecker-apply/*/edge/scripts/apply.sh`
+  — wildcarded because of the random per-run subfolder above; the actual
+  trust boundary is unchanged from the old mechanism, since that whole
+  tree is populated purely by Woodpecker cloning the trusted
+  `homelab-infra` repo
+- enables and starts the `woodpecker-agent` systemd service
+
+Confirm it registered: it should appear as a second agent in Woodpecker's
+admin UI, and `homelab-infra`'s `apply.yaml` workflow (labeled
+`type: host-apply`) should pick it up on the next matching push instead
+of sitting queued with no agent available.
+
 ## Notes
 
-- The agent uses the Docker backend and mounts the host Docker socket.
+- The default agent (`docker-compose.yml`) uses the Docker backend and mounts the host Docker socket. See "Native apply agent" above for the second, host-privileged one.
 - `push` pipelines still require GitHub to deliver webhooks to Woodpecker. In this repo, the simplest public path is Tailscale Funnel on the Docker host plus `WOODPECKER_EXPERT_WEBHOOK_HOST`.
 - Every pipeline step receives the host CA certificate from `/etc/homelab/certs/ca/ca.crt` at `/etc/ssl/certs/homelab-ca.crt`.
 - Pipelines that `curl` homelab services using that CA should use `curl --cacert /etc/ssl/certs/homelab-ca.crt https://...` or set `CURL_CA_BUNDLE=/etc/ssl/certs/homelab-ca.crt`.

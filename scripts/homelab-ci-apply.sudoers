@@ -1,0 +1,1 @@
+jake ALL=(root) NOPASSWD: /home/jake/.homelab-ci-deploy/homelab-edge/scripts/apply.sh

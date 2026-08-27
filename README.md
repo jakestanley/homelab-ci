@@ -159,6 +159,12 @@ Download the matching agent `.deb` for the currently-running server
 version from `https://github.com/woodpecker-ci/woodpecker/releases` (asset
 named `woodpecker-agent_<version>_amd64.deb`) before running this.
 
+Also requires `git-lfs` installed on the host (`sudo apt-get install -y
+git-lfs`) — the Docker-backed agent's images bundle it, but the `local`
+backend uses the bare system `git`, and Woodpecker's clone step always
+runs `git lfs fetch` unconditionally. Found this the hard way: the first
+real pipeline run failed at clone with `git: 'lfs' is not a git command`.
+
 The script:
 - installs the package (it ships only a binary + systemd unit + example
   env file — no post-install automation, so everything below is done by
@@ -177,7 +183,7 @@ The script:
   server-assigned identity across restarts instead of re-registering as
   a new agent every time
 - installs a narrowly-scoped `sudoers` rule:
-  `woodpecker ALL=(root) NOPASSWD: /var/lib/woodpecker-apply/*/edge/scripts/apply.sh`
+  `woodpecker ALL=(root) NOPASSWD: /var/lib/woodpecker-apply/*/workspace/edge/scripts/apply.sh`
   — wildcarded because of the random per-run subfolder above; the actual
   trust boundary is unchanged from the old mechanism, since that whole
   tree is populated purely by Woodpecker cloning the trusted

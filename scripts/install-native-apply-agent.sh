@@ -72,8 +72,12 @@ chmod 600 "$ENV_FILE"
 chown root:root "$ENV_FILE"
 
 echo "== Install sudoers rule scoping 'woodpecker' to only the apply script =="
+# Confirmed via a real pipeline run's clone logs: the local backend
+# clones into $LOCAL_TEMP_DIR/<random>/workspace/, not
+# $LOCAL_TEMP_DIR/<random>/ directly -- the extra /workspace/ segment
+# is required here, not a guess.
 cat > "$SUDOERS_FILE" <<EOF
-woodpecker ALL=(root) NOPASSWD: $LOCAL_TEMP_DIR/*/edge/scripts/apply.sh
+woodpecker ALL=(root) NOPASSWD: $LOCAL_TEMP_DIR/*/workspace/edge/scripts/apply.sh
 EOF
 chmod 440 "$SUDOERS_FILE"
 visudo -c

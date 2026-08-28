@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # One-time (idempotent) setup for the native `local`-backend Woodpecker
-# agent that runs homelab-infra's `apply` workflow directly on this host
-# -- no Docker sandbox, no SSH-forced-command hack. See
-# homelab-infra/.woodpecker/apply.yaml, this repo's README, and the
-# "merge homelab-edge into homelab-infra" plan for context.
+# agent -- runs any workflow labeled `type: host-apply` directly on this
+# host, no Docker sandbox, no SSH-forced-command hack. Originally built
+# for homelab-infra's DNS/nginx apply workflow; also used by
+# arcade-palworld/arcade-minecraft's build+deploy and lib-arcade-sync
+# workflows (docker-compose builds have real path-translation problems
+# running docker-outside-of-docker from inside a sandboxed step -- the
+# native agent sidesteps that entirely). See homelab-infra's
+# .woodpecker/apply.yaml, this repo's README, and the "merge homelab-edge
+# into homelab-infra" / "lib-arcade" plans for context.
 #
 # Authenticates to the server using the SAME system token the existing
 # Docker-backed agent uses (AGENT_SECRET in this repo's .env) -- Woodpecker
@@ -50,6 +55,14 @@ else
   echo "User 'woodpecker' already exists."
 fi
 
+echo "== Add 'woodpecker' to the docker group (needed for docker-compose-based deploy workflows) =="
+if ! id -nG woodpecker | grep -qw docker; then
+  usermod -aG docker woodpecker
+  echo "Added 'woodpecker' to the docker group."
+else
+  echo "'woodpecker' is already in the docker group."
+fi
+
 echo "== Create local-backend temp-dir prefix =="
 mkdir -p "$LOCAL_TEMP_DIR"
 chown woodpecker:woodpecker "$LOCAL_TEMP_DIR"
@@ -82,9 +95,14 @@ EOF
 chmod 440 "$SUDOERS_FILE"
 visudo -c
 
-echo "== Enable and start the agent =="
+echo "== Enable and (re)start the agent =="
+# Explicit restart, not just enable --now: `enable --now` on an already-
+# running service is a no-op, and group membership (docker, above) is
+# only evaluated when a process starts -- an existing run wouldn't pick
+# up the new group without this.
 systemctl daemon-reload
-systemctl enable --now woodpecker-agent
+systemctl enable woodpecker-agent
+systemctl restart woodpecker-agent
 
 sleep 2
 systemctl status woodpecker-agent --no-pager -l

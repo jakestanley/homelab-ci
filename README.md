@@ -137,17 +137,25 @@ You'll probably want the following repos as a minimum:
 
 ## Native apply agent
 
-Some pipeline steps need real host privilege (writing `/etc/dnsmasq.d`,
-`/etc/nginx`, running `systemctl`) that the sandboxed Docker-backed agent
-deliberately doesn't have. Rather than bridge that gap with an SSH key
-and a `sudo`-over-SSH script (the old `ci-apply.sh` mechanism this
-replaced), those steps run on a **second, native agent** using
-Woodpecker's own `local` backend — an officially supported, unsandboxed
-agent mode intended for exactly this kind of trusted, single-operator
-setup. Woodpecker routes a whole workflow file (not individual steps) to
-a specific agent via label matching, so the workflow needing host access
-lives in its own file (`homelab-infra/.woodpecker/apply.yaml`, labeled
-`type: host-apply`) separate from the sandboxed `validate.yaml`.
+Some pipeline steps need real host access that the sandboxed Docker-backed
+agent deliberately doesn't have — either literal root privilege (writing
+`/etc/dnsmasq.d`, `/etc/nginx`, running `systemctl`, in
+`homelab-infra`'s apply workflow), or just a working `docker compose
+build` that isn't fighting docker-outside-of-docker path-translation
+problems (a relative build `context:` inside a sandboxed step's own
+ephemeral filesystem isn't visible to the *host* daemon on the other
+side of a mounted socket — `arcade-palworld`/`arcade-minecraft`'s
+build+deploy and `lib-arcade`-sync workflows). Rather than bridge either
+gap with an SSH key and a `sudo`-over-SSH script (the old `ci-apply.sh`
+mechanism this replaced), those steps run on a **second, native agent**
+using Woodpecker's own `local` backend — an officially supported,
+unsandboxed agent mode intended for exactly this kind of trusted,
+single-operator setup. Woodpecker routes a whole workflow file (not
+individual steps) to a specific agent via label matching, so any
+workflow needing host access lives in its own file, labeled
+`type: host-apply`, separate from sandboxed Docker-backend workflows in
+the same repo. The `woodpecker` system user is also in the `docker`
+group, for the compose-based workflows.
 
 Setup (one-time, idempotent):
 

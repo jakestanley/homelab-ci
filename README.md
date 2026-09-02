@@ -175,17 +175,32 @@ that happened to finish last — not necessarily the one for the newer commit
 — won, briefly redeploying stale adapter code right after a fix had just
 been pushed.
 
-Fix: add `depends_on` to whichever workflow should run second, naming the
-other workflow by its filename without path or extension. Mark it
-`optional: true` if the referenced workflow isn't part of every pipeline
-this workflow can appear in (e.g. `refresh.yaml` also runs standalone on
-`cron`, where no `ci` workflow exists at all):
+The real fix is `depends_on`, naming the other workflow by its filename
+without path or extension, with `optional: true` if the referenced workflow
+isn't part of every pipeline this workflow can appear in (e.g. a
+cron-triggered run where no `ci` workflow exists at all):
 
 ```yaml
 depends_on:
   - name: ci
     optional: true
 ```
+
+**`optional: true` needs Woodpecker v3.15.0+.** This instance is pinned to
+`v3.12.0` (see `docker-compose.yml`) — trying this syntax there fails
+pipeline validation outright (`yaml: unmarshal errors: ... cannot unmarshal
+!!map into string`), confirmed live. Without `optional`, an unconditional
+`depends_on: [ci]` risks blocking/failing the *other* trigger this workflow
+responds to, if `ci` isn't part of that pipeline (exactly `refresh.yaml`'s
+situation: `ci` only exists when both files match, i.e. on a manual
+trigger, not on `refresh.yaml`'s own `cron` trigger).
+
+Until this instance is upgraded past v3.15.0, avoid the race a different
+way: don't give more than one workflow file `event: manual` in the same
+repo. `arcade-cs2` resolved this by dropping `event: manual` from
+`refresh.yaml` entirely — its on-demand path is triggering the
+`every-six-hours` cron job by name from the repo's Cron tab, which only
+matches `refresh.yaml` and never runs `ci.yaml` alongside it.
 
 You'll probably want the following repos as a minimum:
 - homelab-infra

@@ -40,6 +40,11 @@ Create `.env` from `.env.example` and set:
   this same host can reach the server. Default is `20036`. Not needed
   by the Docker-backed agent, which reaches the server over the
   internal Compose network instead.
+- `WOODPECKER_GRPC_SECRET`: Signs JWTs for gRPC connections. Server-only —
+  agents don't read this, and rotating it doesn't require restarting them.
+  If unset, the server generates a random one on every restart, which still
+  works but isn't worth leaving to chance. Generate the same way as
+  `AGENT_SECRET`.
 
 ## Start
 
@@ -186,21 +191,56 @@ depends_on:
     optional: true
 ```
 
-**`optional: true` needs Woodpecker v3.15.0+.** This instance is pinned to
-`v3.12.0` (see `docker-compose.yml`) — trying this syntax there fails
-pipeline validation outright (`yaml: unmarshal errors: ... cannot unmarshal
-!!map into string`), confirmed live. Without `optional`, an unconditional
+**`optional: true` needs Woodpecker v3.15.0+.** This instance was pinned to
+`v3.12.0` when this was first hit, and the syntax above failed pipeline
+validation outright there (`yaml: unmarshal errors: ... cannot unmarshal
+!!map into string`), confirmed live — without `optional`, an unconditional
 `depends_on: [ci]` risks blocking/failing the *other* trigger this workflow
 responds to, if `ci` isn't part of that pipeline (exactly `refresh.yaml`'s
 situation: `ci` only exists when both files match, i.e. on a manual
-trigger, not on `refresh.yaml`'s own `cron` trigger).
+trigger, not on `refresh.yaml`'s own `cron` trigger). This instance is now
+on `v3.18.0` (see "Upgrading" below), so the `depends_on`/`optional: true`
+form above is what `arcade-cs2` actually runs.
 
-Until this instance is upgraded past v3.15.0, avoid the race a different
-way: don't give more than one workflow file `event: manual` in the same
-repo. `arcade-cs2` resolved this by dropping `event: manual` from
-`refresh.yaml` entirely — its on-demand path is triggering the
-`every-six-hours` cron job by name from the repo's Cron tab, which only
-matches `refresh.yaml` and never runs `ci.yaml` alongside it.
+If you hit this on an instance still behind v3.15.0, the version-safe
+workaround is to not give more than one workflow file `event: manual` in
+the same repo — trigger the specific cron job by name from the repo's Cron
+tab for on-demand runs instead, since that only matches the one file that
+declares it.
+
+### Upgrading Woodpecker
+
+Bump both `woodpeckerci/woodpecker-server` and `woodpeckerci/woodpecker-agent`
+image tags in `docker-compose.yml` together, then:
+
+```bash
+docker compose pull woodpecker-server woodpecker-agent
+docker compose up -d woodpecker-server woodpecker-agent
+```
+
+Back up the `woodpecker-server-data` volume first if the target release's
+notes mention a database migration (check
+[the release list](https://github.com/woodpecker-ci/woodpecker/releases)) --
+confirmed low-risk in practice (a few tens of MB, migration completes in
+seconds), but the data is irreplaceable if a migration goes wrong mid-way:
+
+```bash
+docker run --rm -v homelab-ci_woodpecker-server-data:/data:ro \
+  -v "$(pwd)":/backup alpine \
+  tar czf /backup/woodpecker-server-data-backup.tar.gz -C /data .
+```
+
+Check `docker logs homelab-ci-woodpecker-server-1` after restarting for new
+warnings about newly-required config — upgrading `v3.12.0` → `v3.18.0`
+surfaced one: `WOODPECKER_GRPC_SECRET` (signs gRPC JWTs, server-only, not
+needed by agents) didn't exist as a variable before and now needs a real
+persisted value in `.env`, or the server generates a random one on every
+restart. See `.env.example` for the generation method (same as
+`AGENT_SECRET`).
+
+The bare-metal native apply agent (see "Native apply agent" below) is
+**not** covered by this — it needs its own `.deb` bumped and reinstalled to
+match, separately.
 
 You'll probably want the following repos as a minimum:
 - homelab-infra

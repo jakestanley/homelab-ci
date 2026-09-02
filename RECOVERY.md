@@ -1,5 +1,25 @@
 # Recovery
 
+## A scheduled (cron) pipeline never seems to run
+
+Symptom: a repo has a `.woodpecker/*.yaml` file with `when: event: cron, cron:
+"some-name"`, and it's supposed to run on a schedule (e.g. a periodic refresh/pull), but
+it's never once fired, even though `push`/`manual` pipelines for the same repo work fine.
+
+This means no Woodpecker Cron job named `"some-name"` is registered for that repo — the
+YAML filter only matches against a Cron object created separately via the API/UI, it does
+not create one. See the README's "Activate a repository" section for why. Check:
+
+1. Repo settings → Cron tab in the Woodpecker UI. If it's empty, `add-repo.sh` was never
+   run for this repo, or was run before the cron-registration step existed.
+2. Re-run `./scripts/add-repo.sh owner/repo` — it's idempotent and safe against an
+   already-active repo. It backfills the five standard cron jobs (15m/30m/1h/6h/24h) if
+   missing, without touching anything else that's already correct.
+3. To confirm the fix without waiting for the schedule, manually trigger the specific cron
+   that matches your YAML's `cron:` name from the repo's Cron tab. Triggering one of the
+   other four (unreferenced) names is expected to do nothing — that's normal, not a sign
+   the fix failed.
+
 ## Check status
 
 ```bash

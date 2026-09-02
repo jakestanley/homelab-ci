@@ -131,6 +131,33 @@ but cannot update trust, the script exits with an error after activation.
 It also ensures five cron jobs exist on the default branch: every 15 minutes, every 30
 minutes, every hour, every 6 hours, and every 24 hours.
 
+**These five jobs firing is not the same as anything actually running.** Woodpecker cron
+jobs and a repo's `.woodpecker/*.yaml` `when: event: cron` filters are two independent
+things that have to be wired together by name — registering the five jobs above does not,
+by itself, make any pipeline execute. A repo's YAML must explicitly opt in to one of these
+exact names:
+
+```yaml
+when:
+  - event: cron
+    cron: every-six-hours
+    branch: main
+```
+
+Only that one job will ever trigger a real pipeline for this repo. The other four still
+fire silently on schedule (`add-repo.sh` doesn't inspect the repo's YAML, so it registers
+all five for every repo regardless of which ones, if any, are actually referenced) — with
+no workflow file claiming them, Woodpecker logs `"ignoring hook: 'when' filters filtered
+out all steps"` and does nothing. That log line is expected noise, not a failure, for any
+of the four names a repo's YAML doesn't use.
+
+Confirmed live in `arcade-cs2`: its `.woodpecker/refresh.yaml` referenced `cron:
+every-six-hours` from the start, but `add-repo.sh` had never actually been run for this
+repo, so *no* cron jobs existed at all — `refresh.yaml`'s scheduled half had silently never
+run once, for as long as the repo had existed, until `add-repo.sh` backfilled the five jobs.
+The push/webhook side of the repo worked the entire time; only cron was missing, and
+nothing about that failure was visible without checking the repo's Cron tab directly.
+
 You'll probably want the following repos as a minimum:
 - homelab-infra
 - nix

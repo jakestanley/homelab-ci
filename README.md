@@ -158,6 +158,35 @@ run once, for as long as the repo had existed, until `add-repo.sh` backfilled th
 The push/webhook side of the repo worked the entire time; only cron was missing, and
 nothing about that failure was visible without checking the repo's Cron tab directly.
 
+### Multiple `.woodpecker/*.yaml` files sharing a trigger event
+
+Placing more than one pipeline file in `.woodpecker/` gives a repo multiple
+*workflows* inside a single pipeline, not independent pipelines. If two
+files' `when:` blocks both match the same triggering event, Woodpecker runs
+both workflows for that one trigger **in parallel by default, with no
+ordering guarantee**.
+
+This only matters when more than one workflow acts on the same underlying
+resource. Confirmed live in `arcade-cs2`: `ci.yaml` (build+deploy
+`arcade-adapter` on `push`/`manual`) and `refresh.yaml` (pull+start `cs2`,
+then *also* rebuild+deploy `arcade-adapter`, on `cron`/`manual`) both match
+`event: manual`. Triggering a manual run fired both at once, and the build
+that happened to finish last — not necessarily the one for the newer commit
+— won, briefly redeploying stale adapter code right after a fix had just
+been pushed.
+
+Fix: add `depends_on` to whichever workflow should run second, naming the
+other workflow by its filename without path or extension. Mark it
+`optional: true` if the referenced workflow isn't part of every pipeline
+this workflow can appear in (e.g. `refresh.yaml` also runs standalone on
+`cron`, where no `ci` workflow exists at all):
+
+```yaml
+depends_on:
+  - name: ci
+    optional: true
+```
+
 You'll probably want the following repos as a minimum:
 - homelab-infra
 - nix

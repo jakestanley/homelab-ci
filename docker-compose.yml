@@ -41,10 +41,12 @@ services:
       WOODPECKER_AGENT_SECRET: ${AGENT_SECRET}
       WOODPECKER_BACKEND: docker
       WOODPECKER_BACKEND_DOCKER_VOLUMES: /etc/homelab/certs/ca/ca.crt:/etc/ssl/certs/homelab-ca.crt:ro
-      WOODPECKER_VOLUMES: /home/jake/.ssh:/home/jake/.ssh:ro,/nix:/nix
+      # jake's real ~/.ssh is deliberately NOT in this allowlist -- the nix
+      # repo's CI now uses a scoped, read-only GitHub deploy key delivered as a
+      # Woodpecker secret instead (see nix/.woodpecker/ci.yaml).
+      WOODPECKER_VOLUMES: /nix:/nix
     volumes:
       - woodpecker-agent-config:/etc/woodpecker
-      - /home/jake/.ssh:/home/jake/.ssh:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - nix-cache:/nix
 
